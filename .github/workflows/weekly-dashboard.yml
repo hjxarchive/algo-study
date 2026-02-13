@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '59 14 * * 0'
+    - cron: '59 14 * * 0'   # Sunday 23:59 KST (UTC 14:59)
   workflow_dispatch:
 
 permissions:
@@ -19,13 +19,14 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Generate Weekly Stats
-        id: stats
         uses: actions/github-script@v6
         with:
           script: |
+            const fs = require('fs');
             const org = context.repo.owner;
             const repo = context.repo.repo;
 
+            // 1️⃣ Organization 멤버 목록 가져오기
             const { data: members } = await github.rest.orgs.listMembers({
               org: org,
               per_page: 100
@@ -33,19 +34,24 @@ jobs:
 
             const memberLogins = members.map(m => m.login);
 
+            // 2️⃣ KST 기준 이번 주 월요일 00:00 계산
             const now = new Date();
-            const kstOffset = 9 * 60 * 60 * 1000;
-            const kstNow = new Date(now.getTime() + kstOffset);
+            const kstNow = new Date(
+              now.toLocaleString("en-US", { timeZone: "Asia/Seoul" })
+            );
 
-            const day = kstNow.getUTCDay();
-            const diff = day === 0 ? 6 : day - 1;
+            const day = kstNow.getDay();          // 0=일요일
+            const diff = day === 0 ? 6 : day - 1; // 월요일 보정
 
-            const mondayKST = new Date(kstNow);
-            mondayKST.setUTCDate(kstNow.getUTCDate() - diff);
-            mondayKST.setUTCHours(0, 0, 0, 0);
+            kstNow.setDate(kstNow.getDate() - diff);
+            kstNow.setHours(0, 0, 0, 0);
 
-            const mondayUTC = new Date(mondayKST.getTime() - kstOffset);
+            const mondayUTC = new Date(kstNow.toISOString());
 
+            console.log("KST Monday:", kstNow.toISOString());
+            console.log("UTC Monday:", mondayUTC.toISOString());
+
+            // 3️⃣ PR 목록 가져오기
             const { data: pulls } = await github.rest.pulls.list({
               owner: org,
               repo: repo,
@@ -53,10 +59,14 @@ jobs:
               per_page: 100
             });
 
+            // 4️⃣ 이번 주에 merge된 PR만 필터링
             const weekly = pulls.filter(pr =>
               pr.merged_at && new Date(pr.merged_at) >= mondayUTC
             );
 
+            console.log("Merged PR count this week:", weekly.length);
+
+            // 5️⃣ 멤버별 카운트 초기화
             const counts = {};
             memberLogins.forEach(user => counts[user] = 0);
 
@@ -66,8 +76,9 @@ jobs:
               }
             });
 
+            // 6️⃣ Markdown 테이블 생성
             let table = "";
-            table += `📅 기준: ${mondayKST.toISOString().slice(0,10)} (월요일 00:00 KST)\n\n`;
+            table += `📅 기준: ${kstNow.toISOString().slice(0,10)} (월요일 00:00 KST)\n\n`;
             table += "| Member | Count | Status |\n";
             table += "|--------|-------|--------|\n";
 
@@ -77,12 +88,12 @@ jobs:
               table += `| ${user} | ${count} | ${status} |\n`;
             }
 
-            require('fs').writeFileSync('dashboard.md', table);
+            fs.writeFileSync("dashboard.md", table);
 
       - name: Inject into README
         run: |
           awk '
-          FNR==NR {dashboard=$0"\n"; next}
+          FNR==NR {next}
           /<!-- WEEKLY_DASHBOARD_START -->/ {
             print;
             print "";
