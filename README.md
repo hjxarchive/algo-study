@@ -10,7 +10,7 @@
 | Member | Count | Status |
 |--------|-------|--------|
 | FaceWithNull | 10 | ✅ |
-| LYoooJ | 1 | ❌ |
+| LYoooJ | 2 | ❌ |
 | tomchaccom | 4 | ❌ |
 <!-- WEEKLY_DASHBOARD_END -->
 
