@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '59 14 * * 0'   # Sunday 23:59 KST (UTC 14:59)
+    - cron: '59 14 * * 0'   # Sunday 23:59 KST (UTC 기준)
   workflow_dispatch:
 
 permissions:
@@ -18,6 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # ---------------------------
+      # 1️⃣ 통계 계산
+      # ---------------------------
       - name: Generate Weekly Stats
         uses: actions/github-script@v6
         with:
@@ -26,7 +29,7 @@ jobs:
             const org = context.repo.owner;
             const repo = context.repo.repo;
 
-            // 1️⃣ Organization 멤버 목록 가져오기
+            // 🔹 Organization 멤버 목록
             const { data: members } = await github.rest.orgs.listMembers({
               org: org,
               per_page: 100
@@ -34,14 +37,14 @@ jobs:
 
             const memberLogins = members.map(m => m.login);
 
-            // 2️⃣ KST 기준 이번 주 월요일 00:00 계산
+            // 🔹 KST 기준 월요일 00:00 계산
             const now = new Date();
             const kstNow = new Date(
               now.toLocaleString("en-US", { timeZone: "Asia/Seoul" })
             );
 
-            const day = kstNow.getDay();          // 0=일요일
-            const diff = day === 0 ? 6 : day - 1; // 월요일 보정
+            const day = kstNow.getDay();      // 0=일요일
+            const diff = day === 0 ? 6 : day - 1;
 
             kstNow.setDate(kstNow.getDate() - diff);
             kstNow.setHours(0, 0, 0, 0);
@@ -51,7 +54,7 @@ jobs:
             console.log("KST Monday:", kstNow.toISOString());
             console.log("UTC Monday:", mondayUTC.toISOString());
 
-            // 3️⃣ PR 목록 가져오기
+            // 🔹 PR 목록
             const { data: pulls } = await github.rest.pulls.list({
               owner: org,
               repo: repo,
@@ -59,14 +62,14 @@ jobs:
               per_page: 100
             });
 
-            // 4️⃣ 이번 주에 merge된 PR만 필터링
+            // 🔹 이번 주에 merge된 PR 필터링
             const weekly = pulls.filter(pr =>
               pr.merged_at && new Date(pr.merged_at) >= mondayUTC
             );
 
             console.log("Merged PR count this week:", weekly.length);
 
-            // 5️⃣ 멤버별 카운트 초기화
+            // 🔹 멤버별 카운트
             const counts = {};
             memberLogins.forEach(user => counts[user] = 0);
 
@@ -76,7 +79,7 @@ jobs:
               }
             });
 
-            // 6️⃣ Markdown 테이블 생성
+            // 🔹 Markdown 테이블 생성
             let table = "";
             table += `📅 기준: ${kstNow.toISOString().slice(0,10)} (월요일 00:00 KST)\n\n`;
             table += "| Member | Count | Status |\n";
@@ -90,10 +93,12 @@ jobs:
 
             fs.writeFileSync("dashboard.md", table);
 
+      # ---------------------------
+      # 2️⃣ README에 삽입
+      # ---------------------------
       - name: Inject into README
         run: |
           awk '
-          FNR==NR {next}
           /<!-- WEEKLY_DASHBOARD_START -->/ {
             print;
             print "";
@@ -101,12 +106,17 @@ jobs:
             skip=1;
             next;
           }
-          /<!-- WEEKLY_DASHBOARD_END -->/ { skip=0 }
+          /<!-- WEEKLY_DASHBOARD_END -->/ {
+            skip=0;
+          }
           !skip
-          ' dashboard.md README.md > temp.md
+          ' README.md > temp.md
 
           mv temp.md README.md
 
+      # ---------------------------
+      # 3️⃣ 변경사항 커밋
+      # ---------------------------
       - name: Commit changes
         run: |
           git config user.name "github-actions"
