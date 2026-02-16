@@ -8,7 +8,7 @@
 
 | Member | Count | Status |
 |--------|-------|--------|
-| FaceWithNull | 1 | ❌ |
+| FaceWithNull | 2 | ❌ |
 | orca-svg | 1 | ❌ |
 | tomchaccom | 1 | ❌ |
 <!-- WEEKLY_DASHBOARD_END -->
