@@ -10,7 +10,7 @@
 |--------|-------|--------|
 | FaceWithNull | 8 | ✅ |
 | KangYeSeo04 | 1 | ❌ |
-| LYoooJ | 5 | ✅ |
+| LYoooJ | 6 | ✅ |
 | godten-cmd | 5 | ✅ |
 | gun9212 | 1 | ❌ |
 | orca-svg | 1 | ❌ |
