@@ -14,7 +14,7 @@
 | alicebsy | 5 | ✅ |
 | onff02 | 6 | ✅ |
 | orca-svg | 6 | ✅ |
-| sungjaep11 | 4 | ❌ |
+| sungjaep11 | 5 | ✅ |
 | tomchaccom | 8 | ✅ |
 <!-- WEEKLY_DASHBOARD_END -->
 
