@@ -8,6 +8,7 @@
 
 | Member | Count | Status |
 |--------|-------|--------|
+| LYoooJ | 1 | ❌ |
 | Nul0luN | 3 | ❌ |
 | onff02 | 1 | ❌ |
 | orca-svg | 2 | ❌ |
