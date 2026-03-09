@@ -8,7 +8,9 @@
 
 | Member | Count | Status |
 |--------|-------|--------|
-| - | 0 | ❌ |
+| Nul0luN | 3 | ❌ |
+| orca-svg | 2 | ❌ |
+| tomchaccom | 1 | ❌ |
 <!-- WEEKLY_DASHBOARD_END -->
 
 
