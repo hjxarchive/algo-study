@@ -10,14 +10,14 @@
 |--------|-------|--------|
 | KangYeSeo04 | 6 | ✅ |
 | LYoooJ | 6 | ✅ |
-| Nul0luN | 23 | ✅ |
+| Nul0luN | 24 | ✅ |
 | alicebsy | 7 | ✅ |
 | godten-cmd | 5 | ✅ |
 | haeunjeon0410 | 14 | ✅ |
 | onff02 | 11 | ✅ |
 | orca-svg | 11 | ✅ |
 | sungjaep11 | 5 | ✅ |
-| tomchaccom | 11 | ✅ |
+| tomchaccom | 10 | ✅ |
 <!-- WEEKLY_DASHBOARD_END -->
 
 
