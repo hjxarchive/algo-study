@@ -11,6 +11,7 @@
 | LYoooJ | 2 | ❌ |
 | Nul0luN | 2 | ❌ |
 | alicebsy | 1 | ❌ |
+| haeunjeon0410 | 1 | ❌ |
 | sungjaep11 | 1 | ❌ |
 <!-- WEEKLY_DASHBOARD_END -->
 
