@@ -9,7 +9,7 @@
 | Member | Count | Status |
 |--------|-------|--------|
 | LYoooJ | 2 | ❌ |
-| Nul0luN | 1 | ❌ |
+| Nul0luN | 2 | ❌ |
 | alicebsy | 1 | ❌ |
 | sungjaep11 | 1 | ❌ |
 <!-- WEEKLY_DASHBOARD_END -->
