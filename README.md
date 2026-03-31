@@ -10,7 +10,7 @@
 |--------|-------|--------|
 | LYoooJ | 1 | ❌ |
 | Nul0luN | 3 | ❌ |
-| haeunjeon0410 | 6 | ✅ |
+| haeunjeon0410 | 7 | ✅ |
 | onff02 | 5 | ✅ |
 | sungjaep11 | 2 | ❌ |
 | tomchaccom | 1 | ❌ |
