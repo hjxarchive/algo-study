@@ -5,3 +5,4 @@
 | Nul0luN | 2 | ❌ |
 | godten-cmd | 2 | ❌ |
 | onff02 | 3 | ❌ |
+| sungjaep11 | 1 | ❌ |
