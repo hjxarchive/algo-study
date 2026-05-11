@@ -3,4 +3,4 @@
 | Member | Count | Status |
 |--------|-------|--------|
 | LYoooJ | 4 | ❌ |
-| Nul0luN | 5 | ✅ |
+| Nul0luN | 6 | ✅ |
