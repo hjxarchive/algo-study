@@ -4,15 +4,12 @@ on:
   push:
     branches:
       - main
-
   schedule:
     - cron: '0 15 * * 0'
-
   workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: read
 
 concurrency:
   group: weekly-dashboard
@@ -20,20 +17,11 @@ concurrency:
 
 jobs:
   dashboard:
-    if: github.actor != 'github-actions[bot]'
+    # ✅ if 조건 제거 - 커밋 메시지로 무한루프 방지
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
-      - name: Debug Trigger Info
-        run: |
-          echo "========== 트리거 정보 =========="
-          echo "actor      : ${{ github.actor }}"
-          echo "event_name : ${{ github.event_name }}"
-          echo "ref        : ${{ github.ref }}"
-          echo "sha        : ${{ github.sha }}"
-          echo "================================="
-
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -46,6 +34,13 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // ✅ 커밋 메시지로 봇 루프 방지
+            const commitMsg = context.payload.head_commit?.message ?? "";
+            if (commitMsg.includes("weekly dashboard update")) {
+              console.log("봇 커밋 감지 - 스킵");
+              process.exit(0);
+            }
+
             const fs = require("fs");
             const owner = "algo-gongbu";
             const repo = "algo-study";
@@ -82,12 +77,8 @@ jobs:
               mondayKST_inUTC.getTime() + 9 * 60 * 60 * 1000
             ).toISOString().slice(0, 10);
 
-            // ✅ 디버그 로그
-            console.log("========== 날짜 기준 ==========");
-            console.log(`현재 UTC       : ${now.toISOString()}`);
-            console.log(`기준 월요일 KST: ${mondayLabel}`);
-            console.log(`기준 월요일 UTC: ${mondayKST_inUTC.toISOString()}`);
-            console.log("================================");
+            console.log(`기준 월요일 (KST): ${mondayLabel}`);
+            console.log(`기준 UTC: ${mondayKST_inUTC.toISOString()}`);
 
             const pulls = await github.paginate(github.rest.pulls.list, {
               owner,
@@ -96,22 +87,15 @@ jobs:
               per_page: 100
             });
 
-            // ✅ 전체 closed PR 로그
-            console.log(`\n전체 closed PR 수: ${pulls.length}`);
-            pulls.slice(0, 10).forEach(pr =>
-              console.log(`  - #${pr.number} merged_at: ${pr.merged_at} by ${pr.user.login}`)
-            );
-
             const weekly = pulls.filter(pr =>
               pr.merged_at &&
               new Date(pr.merged_at) >= mondayKST_inUTC &&
               !pr.user.login.includes("[bot]")
             );
 
-            // ✅ 필터 결과 로그
-            console.log(`\n이번 주 merged PR 수: ${weekly.length}`);
+            console.log(`이번 주 merged PR 수: ${weekly.length}`);
             weekly.forEach(pr =>
-              console.log(`  ✅ #${pr.number} ${pr.title} by ${pr.user.login} at ${pr.merged_at}`)
+              console.log(`  - #${pr.number} ${pr.title} by ${pr.user.login} at ${pr.merged_at}`)
             );
 
             const counts = {};
@@ -136,7 +120,7 @@ jobs:
             }
 
             fs.writeFileSync("dashboard_table.txt", table);
-            console.log("\ndashboard_table.txt 생성 완료:\n" + table);
+            console.log("dashboard_table.txt 생성 완료:\n" + table);
 
       - name: Inject Dashboard into README
         run: |
@@ -151,8 +135,8 @@ jobs:
               print("ERROR: README.md not found", file=sys.stderr)
               sys.exit(1)
           if not table_file.exists():
-              print("ERROR: dashboard_table.txt not found", file=sys.stderr)
-              sys.exit(1)
+              print("봇 커밋으로 인한 스킵 - 정상 종료")
+              sys.exit(0)
 
           content = readme.read_text(encoding="utf-8")
           dashboard = table_file.read_text(encoding="utf-8").strip()
