@@ -1,11 +1,9 @@
 name: Weekly Dashboard
 
 on:
-  # 1️⃣ 핵심 변경: PR이 닫힐 때(머지 포함) 무조건 트리거를 발생시킴
-  pull_request:
-    types: [closed]
+  push:
     branches:
-      - main
+      - main # 공용 레포 main에 머지(push)되는 순간 무조건 실행
 
   workflow_dispatch:
 
@@ -22,13 +20,7 @@ concurrency:
 
 jobs:
   dashboard:
-    # 2️⃣ 핵심 변경: PR 이벤트라면 'Merged' 된 경우에만 실행 (그냥 Close 된 건 무시)
-    # 수동 실행이나 스케줄 실행은 통과시킴
-    if: |
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule'
-
+    # 모든 if 조건문 삭제! main에 push/merge 되면 무조건 돕니다.
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -116,7 +108,7 @@ jobs:
           end_marker = "<" + "!-- WEEKLY_DASHBOARD_END --" + ">"
 
           if start_marker not in content or end_marker not in content:
-              print(f"Error: Cannot find markers in README.md\nTarget: {start_marker}", file=sys.stderr)
+              print(f"Error: Cannot find markers in README.md", file=sys.stderr)
               sys.exit(1)
 
           try:
@@ -142,7 +134,7 @@ jobs:
             exit 0
           fi
 
-          # CI 무한 루프 방지를 위해 [skip ci] 태그 추가
+          # 봇이 스스로 무한루프에 빠지는 것은 이 [skip ci] 태그가 원천 차단합니다.
           git commit -m "📊 weekly dashboard update [skip ci]"
           git pull --rebase origin main
 
