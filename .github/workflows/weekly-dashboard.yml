@@ -1,15 +1,13 @@
 name: Weekly Dashboard
 
 on:
-  push:
-    branches:
-      - main
-
-  schedule:
-    # Sunday 23:59 KST (UTC 14:59)
-    - cron: '59 14 * * 0'
-
+  # 수동 실행
   workflow_dispatch:
+
+  # 매주 월요일 00:00 KST
+  # UTC 기준 일요일 15:00
+  schedule:
+    - cron: '0 15 * * 0'
 
 permissions:
   contents: write
@@ -34,19 +32,29 @@ jobs:
           persist-credentials: true
 
       # =========================================
-      # 1️⃣ 이번 주 PR 통계 계산
+      # 1️⃣ Debug Info
+      # =========================================
+      - name: Debug Workflow Context
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "ref=${{ github.ref }}"
+          echo "repository=${{ github.repository }}"
+          echo "actor=${{ github.actor }}"
+
+      # =========================================
+      # 2️⃣ 이번 주 PR 통계 계산
       # =========================================
       - name: Generate Weekly Stats
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
+            const fs = require("fs");
 
-            const org = context.repo.owner;
+            const owner = context.repo.owner;
             const repo = context.repo.repo;
 
             // =====================================
-            // KST 기준 이번 주 월요일 00:00 계산
+            // KST 기준 이번 주 월요일 00:00
             // =====================================
             const now = new Date();
 
@@ -56,7 +64,10 @@ jobs:
               })
             );
 
-            const day = kstNow.getDay(); // 0 = Sunday
+            const day = kstNow.getDay();
+
+            // Sunday(0) → 6
+            // Monday(1) → 0
             const diff = day === 0 ? 6 : day - 1;
 
             kstNow.setDate(kstNow.getDate() - diff);
@@ -68,23 +79,29 @@ jobs:
             console.log("UTC Monday:", mondayUTC.toISOString());
 
             // =====================================
-            // Closed PR 조회
+            // 모든 Closed PR 가져오기 (Pagination)
             // =====================================
-            const { data: pulls } =
-              await github.rest.pulls.list({
-                owner: org,
-                repo: repo,
+            const pulls = await github.paginate(
+              github.rest.pulls.list,
+              {
+                owner,
+                repo,
                 state: "closed",
                 per_page: 100
-              });
+              }
+            );
+
+            console.log("Total closed PRs:", pulls.length);
 
             // =====================================
-            // 이번 주 merge된 PR만 필터링
+            // 이번 주 merge된 PR 필터링
             // =====================================
-            const weekly = pulls.filter(pr =>
-              pr.merged_at &&
-              new Date(pr.merged_at) >= mondayUTC
-            );
+            const weekly = pulls.filter(pr => {
+              return (
+                pr.merged_at &&
+                new Date(pr.merged_at) >= mondayUTC
+              );
+            });
 
             console.log(
               "Merged PR count this week:",
@@ -92,7 +109,7 @@ jobs:
             );
 
             // =====================================
-            // 작성자 기준 집계
+            // 작성자별 집계
             // =====================================
             const counts = {};
 
@@ -107,102 +124,129 @@ jobs:
             });
 
             // =====================================
-            // Markdown 테이블 생성
+            // Markdown Table 생성
             // =====================================
             let table = "";
 
-            table += `📅 기준: ${kstNow
+            table += `📅 기준 주간 시작: ${kstNow
               .toISOString()
-              .slice(0, 10)} (월요일 00:00 KST)\n`;
+              .slice(0, 10)} (월요일 00:00 KST)\n\n`;
 
             table += "| Member | Count | Status |\n";
             table += "|--------|-------|--------|\n";
 
-            const authors =
-              Object.keys(counts).sort();
+            const authors = Object.keys(counts).sort();
 
             if (authors.length === 0) {
               table += "| - | 0 | ❌ |\n";
             } else {
               authors.forEach(user => {
                 const count = counts[user];
-                const status =
-                  count >= 5 ? "✅" : "❌";
+                const status = count >= 5
+                  ? "✅"
+                  : "❌";
 
-                table +=
-                  `| ${user} | ${count} | ${status} |\n`;
+                table += `| ${user} | ${count} | ${status} |\n`;
               });
             }
 
-            fs.writeFileSync("dashboard_table.txt", table);
+            console.log(table);
+
+            fs.writeFileSync(
+              "dashboard_table.txt",
+              table
+            );
 
       # =========================================
-      # 2️⃣ README에 직접 테이블 주입
+      # 3️⃣ README 업데이트
       # =========================================
-      - name: Inject into README
+      - name: Inject Dashboard into README
         run: |
-          START="<!-- WEEKLY_DASHBOARD_START -->"
-          END="<!-- WEEKLY_DASHBOARD_END -->"
-          
-          # dashboard_table.txt 읽기
-          TABLE=$(cat dashboard_table.txt)
-          
-          # 임시 파일에 새로운 README 작성
-          awk -v start="$START" -v end="$END" -v table="$TABLE" '
-          BEGIN { in_section = 0 }
-          
-          $0 ~ start {
-            print $0
-            print table
+          if [ ! -f README.md ]; then
+            echo "README.md not found"
+            exit 1
+          fi
+
+          if [ ! -f dashboard_table.txt ]; then
+            echo "dashboard_table.txt not found"
+            exit 1
+          fi
+
+          awk '
+          BEGIN {
+            while ((getline line < "dashboard_table.txt") > 0) {
+              table = table line "\n"
+            }
+          }
+
+          /<!-- WEEKLY_DASHBOARD_START -->/ {
+            print
+            printf "%s", table
             in_section = 1
             next
           }
-          
-          $0 ~ end {
+
+          /<!-- WEEKLY_DASHBOARD_END -->/ {
             in_section = 0
           }
-          
-          !in_section || $0 ~ end {
-            print $0
-          }
+
+          !in_section || /<!-- WEEKLY_DASHBOARD_END -->/
           ' README.md > README.md.tmp
-          
+
           mv README.md.tmp README.md
 
       # =========================================
-      # 3️⃣ 변경사항 커밋 및 푸시
+      # 4️⃣ 변경 확인
       # =========================================
-      - name: Commit and Push changes
+      - name: Verify README Changes
+        run: |
+          echo "===== README Preview ====="
+          cat README.md
+
+          echo ""
+          echo "===== Git Diff ====="
+          git diff
+
+      # =========================================
+      # 5️⃣ Commit & Push
+      # =========================================
+      - name: Commit and Push Changes
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
           git add README.md
 
-          # 변경사항이 있을 때만 commit/push
-          if ! git diff --staged --quiet; then
-            git commit -m "📊 weekly dashboard update [skip ci]"
-
-            # 최신 상태 반영
-            git fetch origin main
-            
-            git rebase --strategy-option=ours origin/main || {
-              echo "Rebase failed, switching to merge strategy..."
-              git rebase --abort
-              git merge origin/main -m "Merge with origin/main [skip ci]" -X ours
-            }
-
-            # Push (최대 3회 재시도)
-            for i in {1..3}; do
-              git push origin HEAD:main && break || {
-                if [ $i -eq 3 ]; then
-                  echo "Failed to push after 3 retries"
-                  exit 1
-                fi
-                echo "Push retry $i/3..."
-                sleep $((i * 3))
-              }
-            done
-          else
-            echo "No changes to commit"
+          # 변경사항 없으면 종료
+          if git diff --staged --quiet; then
+            echo "No changes detected"
+            exit 0
           fi
+
+          git commit -m "📊 weekly dashboard update"
+
+          # 최신 원격 반영
+          git pull --rebase origin main
+
+          # push 재시도
+          for i in 1 2 3
+          do
+            git push origin HEAD:main && break
+
+            echo "Push failed. Retry $i/3"
+
+            if [ $i -eq 3 ]; then
+              echo "Push failed after 3 attempts"
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+      # =========================================
+      # 6️⃣ 최종 상태 출력
+      # =========================================
+      - name: Final Git Status
+        run: |
+          git status
+          git log --oneline -5
