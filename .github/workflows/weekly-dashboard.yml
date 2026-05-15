@@ -2,16 +2,18 @@ name: Weekly Dashboard
 
 on:
   push:
+    branches:
+      - main # 공용 레포 main에 머지되거나, Fork 레포에서 Sync할 때 확실하게 트리거링
 
   workflow_dispatch:
 
-  # 매주 월요일 00:00 KST
-  # UTC 기준 일요일 15:00
+  # 매주 월요일 00:00 KST (UTC 일요일 15:00)
   schedule:
     - cron: '0 15 * * 0'
 
 permissions:
   contents: write
+  pull-requests: read # 안전한 PR 데이터 조회를 위해 권한 추가
 
 concurrency:
   group: weekly-dashboard
@@ -19,7 +21,7 @@ concurrency:
 
 jobs:
   dashboard:
-    # github-actions bot이 만든 commit에는 재실행 방지
+    # github-actions bot이 스스로 만든 커밋으로 인한 무한 루프 재실행 방지
     if: github.actor != 'github-actions[bot]'
 
     runs-on: ubuntu-24.04
@@ -32,6 +34,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
+          ref: main # 트리거된 컨텍스트의 main 브랜치 소스코드를 명시적으로 지정
           fetch-depth: 0
           persist-credentials: true
 
@@ -58,11 +61,8 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // =====================================
             // KST 기준 이번 주 월요일 00:00 계산
-            // =====================================
             const now = new Date();
-
             const kstNow = new Date(
               now.toLocaleString("en-US", {
                 timeZone: "Asia/Seoul"
@@ -70,31 +70,17 @@ jobs:
             );
 
             const day = kstNow.getDay();
-
-            // Sunday(0) → 6
-            // Monday(1) → 0
             const diff = day === 0 ? 6 : day - 1;
 
             kstNow.setDate(kstNow.getDate() - diff);
             kstNow.setHours(0, 0, 0, 0);
 
-            const mondayUTC = new Date(
-              kstNow.toISOString()
-            );
+            const mondayUTC = new Date(kstNow.toISOString());
 
-            console.log(
-              "KST Monday:",
-              kstNow.toISOString()
-            );
+            console.log("KST Monday:", kstNow.toISOString());
+            console.log("UTC Monday:", mondayUTC.toISOString());
 
-            console.log(
-              "UTC Monday:",
-              mondayUTC.toISOString()
-            );
-
-            // =====================================
             // Closed PR 전체 조회
-            // =====================================
             const pulls = await github.paginate(
               github.rest.pulls.list,
               {
@@ -105,14 +91,9 @@ jobs:
               }
             );
 
-            console.log(
-              "Total closed PRs:",
-              pulls.length
-            );
+            console.log("Total closed PRs:", pulls.length);
 
-            // =====================================
             // 이번 주 merge된 PR만 필터링
-            // =====================================
             const weekly = pulls.filter(pr => {
               return (
                 pr.merged_at &&
@@ -120,67 +101,38 @@ jobs:
               );
             });
 
-            console.log(
-              "Merged PR count this week:",
-              weekly.length
-            );
+            console.log("Merged PR count this week:", weekly.length);
 
-            // =====================================
             // 작성자별 집계
-            // =====================================
             const counts = {};
-
             weekly.forEach(pr => {
               const author = pr.user.login;
-
               if (!counts[author]) {
                 counts[author] = 0;
               }
-
               counts[author]++;
             });
 
-            // =====================================
             // Markdown Table 생성
-            // =====================================
             let table = "";
+            table += `📅 기준 주간 시작: ${kstNow.toISOString().slice(0, 10)} (월요일 00:00 KST)\n\n`;
+            table += "| Member | Count | Status |\n";
+            table += "|--------|-------|--------|\n";
 
-            table +=
-              `📅 기준 주간 시작: ${
-                kstNow.toISOString().slice(0, 10)
-              } (월요일 00:00 KST)\n\n`;
-
-            table +=
-              "| Member | Count | Status |\n";
-
-            table +=
-              "|--------|-------|--------|\n";
-
-            const authors =
-              Object.keys(counts).sort();
+            const authors = Object.keys(counts).sort();
 
             if (authors.length === 0) {
               table += "| - | 0 | ❌ |\n";
             } else {
               authors.forEach(user => {
                 const count = counts[user];
-
-                const status =
-                  count >= 5
-                    ? "✅"
-                    : "❌";
-
-                table +=
-                  `| ${user} | ${count} | ${status} |\n`;
+                const status = count >= 5 ? "✅" : "❌";
+                table += `| ${user} | ${count} | ${status} |\n`;
               });
             }
 
             console.log(table);
-
-            fs.writeFileSync(
-              "dashboard_table.txt",
-              table
-            );
+            fs.writeFileSync("dashboard_table.txt", table);
 
       # =========================================
       # 3️⃣ README 업데이트
@@ -194,57 +146,27 @@ jobs:
           table = Path("dashboard_table.txt")
 
           if not readme.exists():
-              raise FileNotFoundError(
-                  "README.md not found"
-              )
+              raise FileNotFoundError("README.md not found")
 
           if not table.exists():
-              raise FileNotFoundError(
-                  "dashboard_table.txt not found"
-              )
+              raise FileNotFoundError("dashboard_table.txt not found")
 
-          content = readme.read_text(
-              encoding="utf-8"
-          )
+          content = readme.read_text(encoding="utf-8")
+          dashboard = table.read_text(encoding="utf-8").strip()
 
-          dashboard = table.read_text(
-              encoding="utf-8"
-          ).strip()
+          start = ""
+          end = ""
 
-          start = "<!-- WEEKLY_DASHBOARD_START -->"
-          end = "<!-- WEEKLY_DASHBOARD_END -->"
-
-          if start not in content:
-              raise ValueError(
-                  "START marker not found"
-              )
-
-          if end not in content:
-              raise ValueError(
-                  "END marker not found"
-              )
+          if start not in content or end not in content:
+              raise ValueError("Markers not found in README.md")
 
           before = content.split(start)[0]
           after = content.split(end)[1]
 
-          updated = (
-              before
-              + start
-              + "\n"
-              + dashboard
-              + "\n"
-              + end
-              + after
-          )
+          updated = before + start + "\n" + dashboard + "\n" + end + after
+          readme.write_text(updated, encoding="utf-8")
 
-          readme.write_text(
-              updated,
-              encoding="utf-8"
-          )
-
-          print(
-              "README updated successfully"
-          )
+          print("README updated successfully")
           PY
 
       # =========================================
@@ -254,7 +176,6 @@ jobs:
         run: |
           echo "===== README Preview ====="
           cat README.md
-
           echo ""
           echo "===== Git Diff ====="
           git diff
@@ -264,34 +185,27 @@ jobs:
       # =========================================
       - name: Commit and Push Changes
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add README.md
 
-          # 변경사항 없으면 종료
           if git diff --staged --quiet; then
             echo "No changes detected"
             exit 0
           fi
 
           git commit -m "📊 weekly dashboard update"
-
-          # 최신 상태 동기화
           git pull --rebase origin main
 
-          # push 재시도
           for i in 1 2 3
           do
             git push origin HEAD:main && break
-
             echo "Push failed. Retry $i/3"
-
             if [ $i -eq 3 ]; then
               echo "Push failed after 3 attempts"
               exit 1
             fi
-
             sleep 5
           done
 
@@ -302,7 +216,6 @@ jobs:
         run: |
           echo "===== FINAL GIT STATUS ====="
           git status
-
           echo ""
           echo "===== RECENT COMMITS ====="
           git log --oneline -5
