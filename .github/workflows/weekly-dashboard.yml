@@ -113,7 +113,7 @@ jobs:
 
             table += `📅 기준: ${kstNow
               .toISOString()
-              .slice(0, 10)} (월요일 00:00 KST)\n\n`;
+              .slice(0, 10)} (월요일 00:00 KST)\n`;
 
             table += "| Member | Count | Status |\n";
             table += "|--------|-------|--------|\n";
@@ -134,38 +134,40 @@ jobs:
               });
             }
 
-            fs.writeFileSync("dashboard.md", table);
+            fs.writeFileSync("dashboard_table.txt", table);
 
       # =========================================
-      # 2️⃣ README 치환
+      # 2️⃣ README에 직접 테이블 주입
       # =========================================
       - name: Inject into README
         run: |
           START="<!-- WEEKLY_DASHBOARD_START -->"
           END="<!-- WEEKLY_DASHBOARD_END -->"
-
-          awk -v start="$START" -v end="$END" '
+          
+          # dashboard_table.txt 읽기
+          TABLE=$(cat dashboard_table.txt)
+          
+          # 임시 파일에 새로운 README 작성
+          awk -v start="$START" -v end="$END" -v table="$TABLE" '
+          BEGIN { in_section = 0 }
+          
           $0 ~ start {
-            print;
-            print "";
-
-            while ((getline line < "dashboard.md") > 0)
-              print line;
-
-            skip=1;
-            next;
+            print $0
+            print table
+            in_section = 1
+            next
           }
-
+          
           $0 ~ end {
-            skip=0;
-            print;
-            next;
+            in_section = 0
           }
-
-          !skip
-          ' README.md > temp.md
-
-          mv temp.md README.md
+          
+          !in_section || $0 ~ end {
+            print $0
+          }
+          ' README.md > README.md.tmp
+          
+          mv README.md.tmp README.md
 
       # =========================================
       # 3️⃣ 변경사항 커밋 및 푸시
@@ -175,13 +177,13 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          git add README.md dashboard.md
+          git add README.md
 
           # 변경사항이 있을 때만 commit/push
           if ! git diff --staged --quiet; then
             git commit -m "📊 weekly dashboard update [skip ci]"
 
-            # 최신 상태 반영 (conflict 자동 해결)
+            # 최신 상태 반영
             git fetch origin main
             
             git rebase --strategy-option=ours origin/main || {
