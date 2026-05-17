@@ -11,7 +11,7 @@
 | Nul0luN | 6 | ✅ |
 | alicebsy | 5 | ✅ |
 | haeunjeon0410 | 4 | ❌ |
-| hjxarchive | 1 | ❌ |
+| hjxarchive | 2 | ❌ |
 | sungjaep11 | 9 | ✅ |
 | tomchaccom | 32 | ✅ |
 <!-- WEEKLY_DASHBOARD_END -->
